@@ -1,0 +1,113 @@
+id: '1769812297457'
+alias: Play album on RFID scan
+description: Trigger Music Assistant playback when RFID text sensor changes
+triggers:
+- entity_id: sensor.covercast_rfid_tag
+  trigger: state
+- entity_id: binary_sensor.covercast_next
+  to: 'on'
+  trigger: state
+- entity_id: binary_sensor.covercast_previous
+  to: 'on'
+  trigger: state
+- entity_id: binary_sensor.covercast_play_pause
+  to: 'on'
+  trigger: state
+- entity_id: number.covercast_volume
+  trigger: state
+actions:
+- choose:
+  - conditions:
+    - condition: template
+      value_template: '{{ trigger.entity_id == ''number.covercast_volume'' }}'
+    sequence:
+    - action: media_player.volume_set
+      target:
+        entity_id:
+        - media_player.unnamed_room
+      data:
+        volume_level: '{{ (states(''number.covercast_volume'') | float(default=5)
+          / 100) | round(2) }}
+
+          '
+  - conditions:
+    - condition: template
+      value_template: '{{ trigger.entity_id == ''binary_sensor.covercast_next''
+        }}'
+    sequence:
+    - target:
+        entity_id: media_player.unnamed_room
+      action: media_player.media_next_track
+  - conditions:
+    - condition: template
+      value_template: '{{ trigger.entity_id == ''binary_sensor.covercast_previous''
+        }}'
+    sequence:
+    - action: media_player.media_previous_track
+      target:
+        entity_id:
+        - media_player.unnamed_room
+      data: {}
+  - conditions:
+    - condition: template
+      value_template: '{{ trigger.entity_id == ''binary_sensor.covercast_play_pause''
+        }}'
+    sequence:
+    - action: media_player.media_play_pause
+      target:
+        entity_id:
+        - media_player.unnamed_room
+      data: {}
+  - conditions:
+    - condition: template
+      value_template: "{{ trigger.entity_id == 'sensor.covercast_rfid_tag'\n   and
+        trigger.to_state.state in rfid_album_map }}\n"
+    sequence:
+    - device_id: 614ce99a444e7b48ab294b6dc5feff22
+      domain: number
+      entity_id: 3e14b74989192cc0baeb68319ca64520
+      type: set_value
+      value: 10
+    - target:
+        entity_id: media_player.unnamed_room
+      data:
+        volume_level: 0.05
+      action: media_player.volume_set
+    - target:
+        entity_id: media_player.unnamed_room
+      data:
+        media:
+          media_content_id: '{{ rfid_album_map[trigger.to_state.state] }}
+
+            '
+          media_content_type: album
+          metadata:
+            navigateIds:
+            - {}
+            - media_content_type: ''
+              media_content_id: __MANUAL_ENTRY__
+            browse_entity_id: media_player.unnamed_room
+      action: media_player.play_media
+  - conditions:
+    - condition: template
+      value_template: "{{ trigger.entity_id == 'sensor.covercast_rfid_tag'\n   and
+        trigger.to_state.state == 'No Tag Present' }}\n"
+    sequence:
+    - target:
+        entity_id: media_player.unnamed_room
+      action: media_player.media_stop
+variables:
+  rfid_album_map:
+    04-31-5F-8B-39-41-89: https://tidal.com/browse/album/326610417
+    04-91-2F-89-39-41-89: https://tidal.com/browse/album/121100864
+    04-91-20-87-39-41-89: https://tidal.com/browse/album/271261
+    04-21-5F-8B-39-41-89: https://tidal.com/browse/album/11986880
+    04-E1-6B-8C-39-41-89: https://tidal.com/browse/album/23841445
+    04-A1-2F-89-39-41-89: https://tidal.com/browse/album/10915646
+    04-41-5F-8B-39-41-89: https://tidal.com/browse/album/427019858
+    04-A1-20-87-39-41-89: https://tidal.com/browse/album/387364
+    04-51-5F-8B-39-41-89: https://tidal.com/browse/album/203946642
+    04-B1-20-87-39-41-89: https://tidal.com/browse/album/324784996
+    04-F1-6B-8C-39-41-89: https://tidal.com/browse/album/211822890
+    04-B1-2F-89-39-41-89: https://tidal.com/browse/album/55391786
+mode: single

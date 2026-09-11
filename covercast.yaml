@@ -1,0 +1,118 @@
+esphome:
+  name: covercast
+  friendly_name: CoverCast
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  power_save_mode: none
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "CoverCast"
+    password: "covercast"
+
+captive_portal:
+
+spi:
+  clk_pin: GPIO18
+  mosi_pin: GPIO23
+  miso_pin: GPIO19
+
+rc522_spi:
+  cs_pin: GPIO5
+  reset_pin: GPIO21
+  update_interval: 1s
+  on_tag:
+    - lambda: |-
+        // Update the text sensor with the new tag's UID string
+        id(rfid_status_text).publish_state(x);
+  on_tag_removed:
+    - lambda: |-
+        // Update the text sensor when no tag is present
+        id(rfid_status_text).publish_state("No Tag Present");
+
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO14
+      inverted: true
+      mode: INPUT_PULLUP
+    name: "Play-Pause"
+
+  - platform: gpio
+    pin:
+      number: GPIO27
+      inverted: false
+      mode: INPUT_PULLUP
+    name: "Next"
+
+  - platform: gpio
+    pin:
+      number: GPIO33
+      inverted: false
+      mode: INPUT_PULLUP
+    name: "Previous"
+
+text_sensor:
+  - platform: template
+    name: "RFID tag"
+    id: rfid_status_text
+    icon: "mdi:nfc"
+
+number:
+  - platform: template
+    name: "Volume"
+    id: covercast_volume
+    min_value: 0
+    max_value: 100
+    step: 1
+    restore_value: true
+    optimistic: true
+
+sensor:
+  - platform: rotary_encoder
+    id: my_rotary_encoder
+    pin_a:
+      number: GPIO13
+      mode: INPUT_PULLUP
+      inverted: true
+    pin_b:
+      number: GPIO25
+      mode: INPUT_PULLUP
+      inverted: true
+    resolution: 1
+    min_value: -10
+    max_value: 10
+    publish_initial_value: false
+    restore_mode: ALWAYS_ZERO
+    on_value:
+      then:
+        - lambda: |-
+            if (x == 0) return;
+
+            auto vol = id(covercast_volume).state + x;
+            if (vol < 0) vol = 0;
+            if (vol > 100) vol = 100;
+
+            id(covercast_volume).publish_state(vol);
+
+            // recenter immediately → endless behavior
+            id(my_rotary_encoder).set_value(0);
