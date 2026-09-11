@@ -1,97 +1,14 @@
-id: '1769812297457'
-alias: Play album on RFID scan
-description: Trigger Music Assistant playback using the album URL read directly off the RFID tag
-triggers:
-- entity_id: sensor.dnevna_soba_covercast_rfid_album_url
-  trigger: state
-- entity_id: binary_sensor.covercast_next
-  to: 'on'
-  trigger: state
-- entity_id: binary_sensor.covercast_previous
-  to: 'on'
-  trigger: state
-- entity_id: binary_sensor.covercast_play_pause
-  to: 'on'
-  trigger: state
-- entity_id: number.covercast_volume
-  trigger: state
-actions:
-- choose:
-  - conditions:
-    - condition: template
-      value_template: '{{ trigger.entity_id == ''number.covercast_volume'' }}'
-    sequence:
-    - action: media_player.volume_set
-      target:
-        entity_id:
-        - media_player.unnamed_room
-      data:
-        volume_level: '{{ (states(''number.covercast_volume'') | float(default=5)
-          / 100) | round(2) }}
-
-          '
-  - conditions:
-    - condition: template
-      value_template: '{{ trigger.entity_id == ''binary_sensor.covercast_next''
-        }}'
-    sequence:
-    - target:
-        entity_id: media_player.unnamed_room
-      action: media_player.media_next_track
-  - conditions:
-    - condition: template
-      value_template: '{{ trigger.entity_id == ''binary_sensor.covercast_previous''
-        }}'
-    sequence:
-    - action: media_player.media_previous_track
-      target:
-        entity_id:
-        - media_player.unnamed_room
-      data: {}
-  - conditions:
-    - condition: template
-      value_template: '{{ trigger.entity_id == ''binary_sensor.covercast_play_pause''
-        }}'
-    sequence:
-    - action: media_player.media_play_pause
-      target:
-        entity_id:
-        - media_player.unnamed_room
-      data: {}
-  - conditions:
-    - condition: template
-      value_template: "{{ trigger.entity_id == 'sensor.dnevna_soba_covercast_rfid_album_url'\n
-        \  and trigger.to_state.state not in ['', 'unknown', 'unavailable'] }}\n"
-    sequence:
-    - device_id: 614ce99a444e7b48ab294b6dc5feff22
-      domain: number
-      entity_id: 3e14b74989192cc0baeb68319ca64520
-      type: set_value
-      value: 10
-    - target:
-        entity_id: media_player.unnamed_room
-      data:
-        volume_level: 0.05
-      action: media_player.volume_set
-    - target:
-        entity_id: media_player.unnamed_room
-      data:
-        media:
-          media_content_id: '{{ trigger.to_state.state }}'
-          media_content_type: album
-          metadata:
-            navigateIds:
-            - {}
-            - media_content_type: ''
-              media_content_id: __MANUAL_ENTRY__
-            browse_entity_id: media_player.unnamed_room
-      action: media_player.play_media
-  - conditions:
-    - condition: template
-      value_template: "{{ trigger.entity_id == 'sensor.dnevna_soba_covercast_rfid_album_url'\n
-        \  and trigger.to_state.state == '' }}\n"
-    sequence:
-    - target:
-        entity_id: media_player.unnamed_room
-      action: media_player.media_stop
-mode: single
+alias: Play album on RFID scan (Living Room CoverCast)
+description: >
+  Instance of the CoverCast Remote blueprint
+  (homeassistant/blueprints/automation/covercast_remote.yaml) for the
+  living room CoverCast pod.
+use_blueprint:
+  path: covercast_remote.yaml
+  input:
+    rfid_url_sensor: sensor.dnevna_soba_covercast_rfid_album_url
+    next_button: binary_sensor.covercast_next
+    previous_button: binary_sensor.covercast_previous
+    play_pause_button: binary_sensor.covercast_play_pause
+    volume_number: number.covercast_volume
+    target_media_player: media_player.unnamed_room

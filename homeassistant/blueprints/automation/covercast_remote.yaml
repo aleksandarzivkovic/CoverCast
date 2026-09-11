@@ -1,0 +1,137 @@
+blueprint:
+  name: CoverCast Remote
+  description: >
+    Control any media_player using a CoverCast-style RFID remote: tap a
+    tag to play the album whose URL is encoded on it, use the buttons
+    for next/previous/play-pause, and the rotary-encoder-backed number
+    entity as a volume knob. Pick the target media player and the
+    CoverCast entities below; install this blueprint again with
+    different choices for another room/pod.
+  domain: automation
+  input:
+    rfid_url_sensor:
+      name: RFID Album URL sensor
+      description: >
+        The text sensor publishing the album URL decoded from the RFID
+        tag (empty string when no tag is present).
+      selector:
+        entity:
+          domain: sensor
+    next_button:
+      name: Next button
+      selector:
+        entity:
+          domain: binary_sensor
+    previous_button:
+      name: Previous button
+      selector:
+        entity:
+          domain: binary_sensor
+    play_pause_button:
+      name: Play/Pause button
+      selector:
+        entity:
+          domain: binary_sensor
+    volume_number:
+      name: Volume number entity
+      selector:
+        entity:
+          domain: number
+    target_media_player:
+      name: Target media player
+      selector:
+        entity:
+          domain: media_player
+
+variables:
+  rfid_url_sensor: !input rfid_url_sensor
+  next_button: !input next_button
+  previous_button: !input previous_button
+  play_pause_button: !input play_pause_button
+  volume_number: !input volume_number
+  target_player: !input target_media_player
+
+triggers:
+  - entity_id: !input rfid_url_sensor
+    trigger: state
+  - entity_id: !input next_button
+    to: 'on'
+    trigger: state
+  - entity_id: !input previous_button
+    to: 'on'
+    trigger: state
+  - entity_id: !input play_pause_button
+    to: 'on'
+    trigger: state
+  - entity_id: !input volume_number
+    trigger: state
+
+actions:
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.entity_id == volume_number }}"
+        sequence:
+          - action: media_player.volume_set
+            target:
+              entity_id: "{{ target_player }}"
+            data:
+              volume_level: "{{ (states(volume_number) | float(default=5) / 100) | round(2) }}"
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.entity_id == next_button }}"
+        sequence:
+          - action: media_player.media_next_track
+            target:
+              entity_id: "{{ target_player }}"
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.entity_id == previous_button }}"
+        sequence:
+          - action: media_player.media_previous_track
+            target:
+              entity_id: "{{ target_player }}"
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.entity_id == play_pause_button }}"
+        sequence:
+          - action: media_player.media_play_pause
+            target:
+              entity_id: "{{ target_player }}"
+      - conditions:
+          - condition: template
+            value_template: >-
+              {{ trigger.entity_id == rfid_url_sensor
+                 and trigger.to_state.state not in ['', 'unknown', 'unavailable'] }}
+        sequence:
+          - action: number.set_value
+            target:
+              entity_id: "{{ volume_number }}"
+            data:
+              value: 10
+          - action: media_player.volume_set
+            target:
+              entity_id: "{{ target_player }}"
+            data:
+              volume_level: 0.05
+          - action: media_player.play_media
+            target:
+              entity_id: "{{ target_player }}"
+            data:
+              media_content_id: "{{ trigger.to_state.state }}"
+              media_content_type: album
+              metadata:
+                navigateIds:
+                  - {}
+                  - media_content_type: ''
+                    media_content_id: __MANUAL_ENTRY__
+                browse_entity_id: "{{ target_player }}"
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.entity_id == rfid_url_sensor and trigger.to_state.state == '' }}"
+        sequence:
+          - action: media_player.media_stop
+            target:
+              entity_id: "{{ target_player }}"
+
+mode: single
