@@ -1,8 +1,8 @@
 id: '1769812297457'
 alias: Play album on RFID scan
-description: Trigger Music Assistant playback when RFID text sensor changes
+description: Trigger Music Assistant playback using the album URL read directly off the RFID tag
 triggers:
-- entity_id: sensor.covercast_rfid_tag
+- entity_id: sensor.dnevna_soba_covercast_rfid_album_url
   trigger: state
 - entity_id: binary_sensor.covercast_next
   to: 'on'
@@ -60,8 +60,8 @@ actions:
       data: {}
   - conditions:
     - condition: template
-      value_template: "{{ trigger.entity_id == 'sensor.covercast_rfid_tag'\n   and
-        trigger.to_state.state in rfid_album_map }}\n"
+      value_template: "{{ trigger.entity_id == 'sensor.dnevna_soba_covercast_rfid_album_url'\n
+        \  and trigger.to_state.state not in ['', 'unknown', 'unavailable'] }}\n"
     sequence:
     - device_id: 614ce99a444e7b48ab294b6dc5feff22
       domain: number
@@ -77,9 +77,7 @@ actions:
         entity_id: media_player.unnamed_room
       data:
         media:
-          media_content_id: '{{ rfid_album_map[trigger.to_state.state] }}
-
-            '
+          media_content_id: '{{ trigger.to_state.state }}'
           media_content_type: album
           metadata:
             navigateIds:
@@ -90,24 +88,10 @@ actions:
       action: media_player.play_media
   - conditions:
     - condition: template
-      value_template: "{{ trigger.entity_id == 'sensor.covercast_rfid_tag'\n   and
-        trigger.to_state.state == 'No Tag Present' }}\n"
+      value_template: "{{ trigger.entity_id == 'sensor.dnevna_soba_covercast_rfid_album_url'\n
+        \  and trigger.to_state.state == '' }}\n"
     sequence:
     - target:
         entity_id: media_player.unnamed_room
       action: media_player.media_stop
-variables:
-  rfid_album_map:
-    04-31-5F-8B-39-41-89: https://tidal.com/browse/album/326610417
-    04-91-2F-89-39-41-89: https://tidal.com/browse/album/121100864
-    04-91-20-87-39-41-89: https://tidal.com/browse/album/271261
-    04-21-5F-8B-39-41-89: https://tidal.com/browse/album/11986880
-    04-E1-6B-8C-39-41-89: https://tidal.com/browse/album/23841445
-    04-A1-2F-89-39-41-89: https://tidal.com/browse/album/10915646
-    04-41-5F-8B-39-41-89: https://tidal.com/browse/album/427019858
-    04-A1-20-87-39-41-89: https://tidal.com/browse/album/387364
-    04-51-5F-8B-39-41-89: https://tidal.com/browse/album/203946642
-    04-B1-20-87-39-41-89: https://tidal.com/browse/album/324784996
-    04-F1-6B-8C-39-41-89: https://tidal.com/browse/album/211822890
-    04-B1-2F-89-39-41-89: https://tidal.com/browse/album/55391786
 mode: single
