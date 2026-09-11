@@ -2,6 +2,13 @@ esphome:
   name: covercast
   friendly_name: CoverCast
 
+# Local override of the built-in rc522 component, adding MIFARE Ultralight/NTAG
+# page reading + NDEF URI decoding. See components/rc522/rc522.h for details.
+external_components:
+  - source:
+      type: local
+      path: components
+
 esp32:
   board: esp32dev
   framework:
@@ -42,12 +49,14 @@ rc522_spi:
   update_interval: 1s
   on_tag:
     - lambda: |-
-        // Update the text sensor with the new tag's UID string
+        // x = tag UID, y = decoded NDEF URI payload ("" if the tag has none)
         id(rfid_status_text).publish_state(x);
+        id(rfid_url_text).publish_state(y);
   on_tag_removed:
     - lambda: |-
-        // Update the text sensor when no tag is present
+        // Update the text sensors when no tag is present
         id(rfid_status_text).publish_state("No Tag Present");
+        id(rfid_url_text).publish_state("");
 
 binary_sensor:
   - platform: gpio
@@ -76,6 +85,11 @@ text_sensor:
     name: "RFID tag"
     id: rfid_status_text
     icon: "mdi:nfc"
+
+  - platform: template
+    name: "RFID Album URL"
+    id: rfid_url_text
+    icon: "mdi:link-variant"
 
 number:
   - platform: template

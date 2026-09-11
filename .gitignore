@@ -8,3 +8,4 @@
 /.venv/
 /.claude/
 /config_entry-esphome-*.json
+__pycache__/
