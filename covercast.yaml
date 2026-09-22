@@ -30,6 +30,10 @@ wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
   power_save_mode: none
+  output_power: 20
+  # Only one AP is ever in range, so periodic re-scans for a "better" one just cost stalls
+  # (briefly blocking the main loop) with no upside.
+  post_connect_roaming: false
 
   # Enable fallback hotspot (captive portal) in case wifi connection fails
   ap:

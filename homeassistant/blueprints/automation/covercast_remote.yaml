@@ -134,4 +134,4 @@ actions:
             target:
               entity_id: "{{ target_player }}"
 
-mode: single
+mode: restart
