@@ -47,6 +47,11 @@ rc522_spi:
   cs_pin: GPIO5
   reset_pin: GPIO21
   update_interval: 1s
+  # A tag sitting on the reader for a long time occasionally misses a single 1s poll (angle/
+  # RF noise), which used to fire on_tag_removed immediately, then on_tag again on the next
+  # good poll -- restarting album playback in Home Assistant. Require this many consecutive
+  # missed polls before actually treating the tag as removed.
+  tag_lost_threshold: 3
   on_tag:
     - lambda: |-
         // x = tag UID, y = decoded NDEF URI payload ("" if the tag has none)

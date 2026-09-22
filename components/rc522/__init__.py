@@ -14,6 +14,7 @@ CODEOWNERS = ["@glmnet"]
 AUTO_LOAD = ["binary_sensor", "nfc"]
 
 CONF_RC522_ID = "rc522_id"
+CONF_TAG_LOST_THRESHOLD = "tag_lost_threshold"
 
 rc522_ns = cg.esphome_ns.namespace("rc522")
 RC522 = rc522_ns.class_("RC522", cg.PollingComponent, i2c.I2CDevice)
@@ -35,6 +36,10 @@ RC522_SCHEMA = cv.Schema(
                 cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(RC522Trigger),
             }
         ),
+        # Consecutive missed polls required before a present tag is declared removed. Filters
+        # out single-poll read flickers that would otherwise fire a spurious on_tag_removed
+        # immediately followed by a re-fired on_tag (e.g. restarting album playback in HA).
+        cv.Optional(CONF_TAG_LOST_THRESHOLD, default=3): cv.int_range(min=1, max=20),
     }
 ).extend(cv.polling_component_schema("1s"))
 
@@ -45,6 +50,8 @@ async def setup_rc522(var, config):
     if CONF_RESET_PIN in config:
         reset = await cg.gpio_pin_expression(config[CONF_RESET_PIN])
         cg.add(var.set_reset_pin(reset))
+
+    cg.add(var.set_tag_lost_threshold(config[CONF_TAG_LOST_THRESHOLD]))
 
     for conf in config.get(CONF_ON_TAG, []):
         trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID])

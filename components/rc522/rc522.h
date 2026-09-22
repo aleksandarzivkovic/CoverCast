@@ -33,6 +33,10 @@ class RC522 : public PollingComponent {
   void register_ontagremoved_trigger(RC522Trigger *trig) { this->triggers_ontagremoved_.push_back(trig); }
 
   void set_reset_pin(GPIOPin *reset) { this->reset_pin_ = reset; }
+  // Number of consecutive missed polls required before a present tag is treated as removed.
+  // Filters out single-poll read flickers (tag angle/distance, RF noise) that would otherwise
+  // fire a spurious on_tag_removed immediately followed by a re-fired on_tag.
+  void set_tag_lost_threshold(uint8_t threshold) { this->tag_lost_threshold_ = threshold; }
 
  protected:
   // Return codes from the functions in this class. Remember to update GetStatusCodeName() if you add more.
@@ -282,6 +286,13 @@ class RC522 : public PollingComponent {
   void start_ndef_read_(std::vector<uint8_t> &&uid);
   void request_ndef_chunk_();
   void finalize_tag_();
+
+  // Called whenever a poll fails to read a tag (REQA timeout, or a failure during
+  // anticollision/select). Debounces transient misses so a single dropped read doesn't
+  // immediately fire on_tag_removed for a tag that is still sitting on the reader.
+  void handle_missed_scan_();
+  uint8_t missing_scans_{0};
+  uint8_t tag_lost_threshold_{3};
 
   enum RC522Error {
     NONE = 0,

@@ -136,23 +136,24 @@ void RC522::loop() {
 
   switch (state_) {
     case STATE_PICC_REQUEST_A: {
-      if (status == STATUS_TIMEOUT) {  // no tag present
-        for (auto *obj : this->binary_sensors_)
-          obj->on_scan_end();  // reset the binary sensors
+      // Any failure to cleanly read the ATQA this poll -- silence (TIMEOUT), a garbled response
+      // (Not OK, e.g. CRC/parity/collision errors from a tag half-leaving the field), or an
+      // unexpected length -- is treated as a possible miss and debounced the same way, since
+      // physically pulling a tag away mid-communication tends to produce a comm error rather
+      // than a clean timeout.
+      if (status == STATUS_TIMEOUT) {
         ESP_LOGV(TAG, "CMD_REQA -> TIMEOUT (no tag present) %d", status);
-        state_ = STATE_DONE;
+        handle_missed_scan_();
       } else if (status != STATUS_OK) {
         ESP_LOGW(TAG, "CMD_REQA -> Not OK %d", status);
-        state_ = STATE_DONE;
+        handle_missed_scan_();
       } else if (back_length_ != 2) {  // || *valid_bits_ != 0) {  // ATQA must be exactly 16 bits.
         ESP_LOGW(TAG, "CMD_REQA -> OK, but unexpected back_length_ of %d", back_length_);
-        state_ = STATE_DONE;
+        handle_missed_scan_();
       } else {
+        // Tag responded; a fresh removal now needs its own run of missed scans.
+        this->missing_scans_ = 0;
         state_ = STATE_READ_SERIAL;
-      }
-      if (state_ == STATE_DONE) {
-        // Don't wait another loop cycle
-        pcd_antenna_off_();
       }
       break;
     }
@@ -202,12 +203,13 @@ void RC522::loop() {
                    format_hex_pretty_to(hex_buf, buffer_, back_length_, '-'));
         }
 
-        state_ = STATE_DONE;
         uid_idx_ = 0;
-
-        pcd_antenna_off_();
+        handle_missed_scan_();
         return;
       }
+
+      // Tag confirmed present this poll; a fresh removal now needs its own run of missed scans.
+      this->missing_scans_ = 0;
 
       // copy the uid
       bool cascade = buffer_[2] == PICC_CMD_CT;  // todo: should be determined based on select response (buffer[6])
@@ -297,6 +299,36 @@ void RC522::loop() {
       break;
   }
 }  // namespace rc522
+
+/**
+ * Handles a poll that failed to confirm a tag (REQA timeout, or a failed anticollision/select).
+ * A single miss is treated as a transient flicker rather than a removal: only after
+ * `tag_lost_threshold_` consecutive misses is the tag actually declared removed.
+ */
+void RC522::handle_missed_scan_() {
+  pcd_antenna_off_();
+
+  if (this->current_uid_.empty()) {
+    // No tag was considered present anyway; nothing to debounce.
+    for (auto *obj : this->binary_sensors_)
+      obj->on_scan_end();
+    this->missing_scans_ = 0;
+    state_ = STATE_DONE;
+    return;
+  }
+
+  if (++this->missing_scans_ < this->tag_lost_threshold_) {
+    ESP_LOGV(TAG, "Tag not read this poll (%d/%d misses); waiting for confirmation before treating it as removed",
+             this->missing_scans_, this->tag_lost_threshold_);
+    state_ = STATE_INIT;  // retry next poll, current_uid_ (and thus "present" state) unchanged
+    return;
+  }
+
+  this->missing_scans_ = 0;
+  for (auto *obj : this->binary_sensors_)
+    obj->on_scan_end();
+  state_ = STATE_DONE;
+}
 
 /**
  * Performs a soft reset on the MFRC522 chip and waits for it to be ready again.
